@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import seedProducts from '../../../../server/data/products.json';
-import { CATEGORIES, formatCOP, LOW_STOCK_THRESHOLD } from '../domain/product';
+import {
+  CATEGORIES,
+  filterProducts,
+  formatCOP,
+  LOW_STOCK_THRESHOLD,
+  toProductView,
+  validateProduct,
+} from '../domain/product';
 
 /**
  * Pruebas unitarias de EJEMPLO (ya vienen dadas) para que `npm test` corra desde el inicio.
@@ -34,19 +41,42 @@ describe('formatCOP (ejemplo)', () => {
   });
 });
 
-/**
- * TODO(Parte 5): agregue sus pruebas UNITARIAS aquí (o en archivos nuevos dentro de __tests__/).
- * Mínimo dos de estas funciones del dominio: `validateProduct`, `toProductView` o `filterProducts`.
- * Quite el `.todo` cuando escriba el cuerpo de cada una.
- */
 describe('validateProduct', () => {
-  it.todo('rechaza un nombre vacío, un precio menor o igual que 0 y una categoría no permitida');
+  it('rechaza un nombre vacío, un precio menor o igual que 0 y una categoría no permitida', () => {
+    const result = validateProduct({ name: '   ', price: 0, category: 'Ropa', stock: 2.5 });
+
+    expect(result.isValid).toBe(false);
+    expect(Object.keys(result.errors).sort()).toEqual(['category', 'name', 'price', 'stock']);
+  });
+
+  it('acepta un producto válido y rechaza un nombre de más de 60 caracteres', () => {
+    const valid = { name: 'Café molido 500 g', price: 18500, category: 'Bebidas', stock: 0 };
+
+    expect(validateProduct(valid)).toEqual({ isValid: true, errors: {} });
+    expect(validateProduct({ ...valid, name: 'a'.repeat(61) }).errors.name).toBeDefined();
+  });
 });
 
 describe('toProductView', () => {
-  it.todo('formatea el precio en pesos y marca «Agotado» y «Pocas unidades»');
+  it('formatea el precio en pesos y marca «Agotado» y «Pocas unidades»', () => {
+    const [, , lowStock, , outOfStock, , , pot] = seedProducts.map(toProductView);
+
+    expect(pot.priceLabel).toBe('$ 189.900');
+    expect(pot.stockLabel).toBe('Disponible');
+    expect(lowStock).toMatchObject({ stockLabel: 'Pocas unidades', isLowStock: true, isOutOfStock: false });
+    expect(outOfStock).toMatchObject({ stockLabel: 'Agotado', isLowStock: false, isOutOfStock: true });
+  });
 });
 
 describe('filterProducts', () => {
-  it.todo('filtra por texto sin distinguir mayúsculas y por categoría exacta');
+  it('filtra por texto sin distinguir mayúsculas y por categoría exacta', () => {
+    const idsOf = (search: string, category: string) =>
+      filterProducts(seedProducts, { search, category }).map((product) => product.id);
+
+    expect(idsOf('JABÓN', '')).toEqual([7]);
+    expect(idsOf('', 'Snacks')).toEqual([4, 5]);
+    expect(idsOf('de', 'Snacks')).toEqual([5]);
+    expect(idsOf('   ', '')).toHaveLength(8);
+    expect(idsOf('', 'snacks')).toEqual([]); // la categoría es exacta
+  });
 });
